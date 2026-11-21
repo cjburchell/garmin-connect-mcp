@@ -30,6 +30,8 @@
     "dist/src"
   ],
   "scripts": {
+    "start:http": "node --env-file-if-exists=.env dist/src/local-http.js",
+    "dev:http": "node --env-file-if-exists=.env --import tsx src/local-http.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepare": "npm run build",

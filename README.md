@@ -1,5 +1,72 @@
 # Garmin Connect MCP
 
+## Local Windows fork
+
+This fork runs privately on Windows at `http://127.0.0.1:8091/mcp`. It retains the upstream 26 read-only API tools and adds `garmin_get_training_summary` for bounded activity and weekly aggregates. No Garmin password, scraping, database, public host, or paid infrastructure is required.
+
+Recommended always-on setup (Docker Desktop, Linux containers):
+
+```powershell
+cd E:\dev\Garmin-MCP
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\configure-local.ps1
+docker compose up -d --build
+curl.exe http://127.0.0.1:8091/health
+```
+
+Enable Docker Desktop's **Start Docker Desktop when you sign in** setting. Compose uses `restart: unless-stopped`: the adapter restarts when Docker starts, unless deliberately stopped. This is sign-in startup, not an unattended Windows boot service. The image runs as a non-root user with a read-only filesystem; only the host loopback interface publishes port 8091. It contains no credentials or development dependencies.
+
+Without Docker, use Node **24 LTS** (tested on Windows):
+
+```powershell
+cd E:\dev\Garmin-MCP
+npm.cmd ci --ignore-scripts
+npm.cmd run build
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\configure-local.ps1
+npm.cmd run start:http
+```
+
+Use `npm.cmd run dev:http` for development, `npm.cmd run typecheck` and `npm.cmd test` for offline validation. Native mode runs in the foreground and is not automatically registered as a service. Do not run native and Docker modes on the same port together.
+
+### Connect Garmin
+
+1. Create a Personal API key at [Garmin Connect settings](https://connect.garmin.com/app/settings/personalApiToken), accepting Garmin's terms yourself. Availability for your account must be verified by signing in.
+2. Store it locally with the hidden prompt:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\configure-local.ps1 -SetGarminKey
+   ```
+
+3. The script restricts `.env` to your Windows user and SYSTEM. It is still a plaintext secret file: keep it out of Git and shared backups. Do not paste keys into chat. Garmin tokens remain in process memory.
+4. Live calls are blocked until you explicitly authorize access and set `GARMIN_ALLOW_NETWORK=true` in `.env`. Recreate with `docker compose up -d --force-recreate`, or restart the native process. Health and tool discovery work before credentials are configured.
+
+Clients must send `Authorization: Bearer <MCP_AUTH_TOKEN>` using the generated token in `.env`. Do not place the actual token in tracked client configuration. Native startup loads `.env` automatically. Docker injects it at runtime, never at image build time.
+
+### Initial tools and example requests
+
+Existing names are retained to avoid duplicate tools:
+
+| Requested capability | Implemented tool and parameters |
+|---|---|
+| Recent activities | `garmin_search_activities`: `limit`, optional `activityType`, `startDate`, `endDate` |
+| Activity details | `garmin_get_activity`: `activityId` |
+| Training summary | `garmin_get_training_summary`: `startDate`, `endDate`, optional `activityType` |
+| Sleep | `garmin_get_sleep_summaries`: `startDate`, `endDate` (31 days) |
+| HRV | `garmin_get_hrv_summaries`: `fromDate`, `toDate` |
+| Resting heart rate | `garmin_get_daily_summaries`: `startDate`, `endDate` |
+| Body Battery | `garmin_get_body_battery`: `startDate`, `endDate`, optional `chunks` (31 days) |
+
+Recovery measurements reuse these existing tools; no duplicate `get_recovery_metrics` wrapper makes four hidden calls. Garmin's documented API has no dedicated training-readiness or recovery-time endpoint; those are unsupported here. A 204 becomes explicit `noData`; empty arrays/objects remain empty, and unreported fields mean unavailable. Never infer missing measurements as zero.
+
+Example MCP request bodies after initialization:
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"garmin_search_activities","arguments":{"limit":5,"activityType":"running","startDate":"2026-11-01","endDate":"2026-11-20"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"garmin_get_activity","arguments":{"activityId":"123456789"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"garmin_get_training_summary","arguments":{"startDate":"2026-11-01","endDate":"2026-11-20"}}}
+```
+
+See [architecture and evaluation](docs/architecture.md), [private ChatGPT connection](docs/chatgpt-integration.md), and [troubleshooting](docs/troubleshooting.md). The original upstream deployment instructions below describe public hosting alternatives; they have not been executed for this installation.
+
 Let Claude, Gemini, ChatGPT or any other [MCP](https://modelcontextprotocol.io) client read **your own** Garmin data (activities, sleep, HRV, Body Battery, stress, steps, heart rate, weight and more) through Garmin's official [Connect Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api).
 
 > "How did I sleep this week compared to last week?" · "Summarize my last five runs." · "Which days this month did I miss my step goal?"

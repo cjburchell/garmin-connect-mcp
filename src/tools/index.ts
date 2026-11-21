@@ -67,9 +67,10 @@ function dropNullFields(value: unknown): unknown {
 
 /** Validate, call Garmin, and shape the result. Never throws: failures become `isError` results. */
 export async function runTool(tool: GarminTool, args: unknown, ctx: ToolContext): Promise<CallToolResult> {
-  const problem = tool.validate?.(args as never);
-  if (problem) return errorResult(problem);
   try {
+    args = tool.inputSchema.parse(args);
+    const problem = tool.validate?.(args as never);
+    if (problem) return errorResult(problem);
     if (tool.kind === 'custom') return await tool.run(args as never, ctx);
     const { path, query } = tool.request(args as never, ctx);
     return jsonResult(await ctx.client.getJson(path, query));

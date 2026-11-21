@@ -48,7 +48,7 @@ export class GarminClient {
   async getJson(path: string, query?: Query): Promise<JsonResult> {
     const response = await this.send(path, query, 'application/json');
     if (response.status === 204) return { noData: true };
-    const text = await response.text();
+    const text = new TextDecoder().decode(await readBody(response, 1024 * 1024));
     if (!text.trim()) return { noData: true };
     try {
       return { noData: false, data: JSON.parse(text) };

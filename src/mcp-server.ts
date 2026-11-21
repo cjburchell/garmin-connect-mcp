@@ -6,6 +6,7 @@ import type { ToolContext } from './tools/define.js';
 import { serverIcons } from './icon.js';
 import { registerAllTools } from './tools/index.js';
 import { utcToday } from './tools/schemas.js';
+import { registerTrainingTool } from './tools/training.js';
 
 /** Internal name: log prefixes and the HTTP auth realm. */
 export const SERVER_NAME = 'garmin-connect-mcp';
@@ -50,5 +51,6 @@ export function createGarminServer(ctx: ToolContext, options: { publicOrigin?: s
     { instructions: INSTRUCTIONS },
   );
   registerAllTools(server, ctx);
+  registerTrainingTool(server, ctx);
   return server;
 }

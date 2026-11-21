@@ -1,0 +1,17 @@
+services:
+  garmin-mcp:
+    build: .
+    image: garmin-mcp:local
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8091
+    ports:
+      - "127.0.0.1:8091:8091"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 100

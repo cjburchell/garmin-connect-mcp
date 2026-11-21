@@ -22,7 +22,7 @@ async function importGraph(entry: string, seen = new Set<string>()): Promise<Set
 describe('HTTP path portability (Vercel, Workers, Netlify, Deno)', () => {
   it('reaches no Node-only modules or globals from src/http.ts', async () => {
     const files = await importGraph(join(SRC, 'http.ts'));
-    expect([...files].map((f) => f.slice(SRC.length + 1))).toContain('tools/activities.ts');
+    expect([...files].map((f) => f.slice(SRC.length + 1).replaceAll('\\', '/'))).toContain('tools/activities.ts');
 
     for (const file of files) {
       const code = await readFile(file, 'utf8');

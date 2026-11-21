@@ -147,7 +147,7 @@ describe('tool registry', () => {
     const { client } = await connect(() => json({}));
     const { tools } = await client.listTools();
 
-    expect(tools).toHaveLength(26);
+    expect(tools).toHaveLength(27);
     for (const tool of tools) {
       expect(tool.name).toMatch(/^garmin_[a-z0-9_]+$/);
       expect(tool.description?.length ?? 0).toBeGreaterThan(80);
