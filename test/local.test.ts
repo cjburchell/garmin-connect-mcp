@@ -36,7 +36,12 @@ describe('Windows-compatible local HTTP host', () => {
     expect(resource).toMatchObject({ resource: 'https://garmin.example/garmin/mcp', authorization_servers: ['https://garmin.example/garmin'] });
     expect((await fetch(url + '/mcp')).headers.get('www-authenticate')).toContain('https://garmin.example/garmin/.well-known/');
     const login = await fetch(url + '/oauth/authorize?response_type=code&client_id=garmin-mcp&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fconnector_platform_oauth_redirect');
+    expect(login.headers.get('referrer-policy')).toBe('strict-origin');
     expect(await login.text()).toContain('action="/garmin/oauth/authorize"');
+    const nullOrigin = await fetch(url + '/oauth/authorize', { method: 'POST', headers: { origin: 'null' }, body: '' });
+    expect(nullOrigin.status).toBe(403);
+    const sameOrigin = await fetch(url + '/oauth/authorize', { method: 'POST', headers: { origin: 'https://garmin.example', 'content-type': 'application/x-www-form-urlencoded' }, body: '' });
+    expect(sameOrigin.status).not.toBe(403);
   });
   it('uses only the configured public origin for OAuth behind an authorized proxy', async () => {
     const url = await start({ PUBLIC_URL: 'https://garmin.example:8443', MCP_OAUTH_CLIENT_SECRET: 'a-client-secret-at-least-32-characters' });

@@ -74,7 +74,9 @@ function htmlResponse(body: string, status: number): Response {
       // blocks. Injected forms aren't possible anyway: no scripts run and every value is escaped.
       'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
       'x-frame-options': 'DENY',
-      'referrer-policy': 'no-referrer',
+      // no-referrer makes browser form POSTs send Origin: null, defeating the
+      // local host's strict Origin check. Send only the origin, never the query.
+      'referrer-policy': 'strict-origin',
     },
   });
 }
