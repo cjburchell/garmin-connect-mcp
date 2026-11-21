@@ -28,6 +28,16 @@ async function connect(url: string) {
   return client;
 }
 describe('Windows-compatible local HTTP host', () => {
+  it('supports path-mounted proxy discovery without pointing OAuth at another service', async () => {
+    const url = await start({ PUBLIC_URL: 'https://garmin.example/garmin', MCP_OAUTH_CLIENT_SECRET: 'a-client-secret-at-least-32-characters' });
+    const metadata = await (await fetch(url + '/garmin/.well-known/oauth-authorization-server')).json();
+    expect(metadata).toMatchObject({ issuer: 'https://garmin.example/garmin', authorization_endpoint: 'https://garmin.example/garmin/oauth/authorize' });
+    const resource = await (await fetch(url + '/.well-known/oauth-protected-resource/mcp')).json();
+    expect(resource).toMatchObject({ resource: 'https://garmin.example/garmin/mcp', authorization_servers: ['https://garmin.example/garmin'] });
+    expect((await fetch(url + '/mcp')).headers.get('www-authenticate')).toContain('https://garmin.example/garmin/.well-known/');
+    const login = await fetch(url + '/oauth/authorize?response_type=code&client_id=garmin-mcp&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fconnector_platform_oauth_redirect');
+    expect(await login.text()).toContain('action="/garmin/oauth/authorize"');
+  });
   it('uses only the configured public origin for OAuth behind an authorized proxy', async () => {
     const url = await start({ PUBLIC_URL: 'https://garmin.example:8443', MCP_OAUTH_CLIENT_SECRET: 'a-client-secret-at-least-32-characters' });
     const response = await fetch(url + '/.well-known/oauth-authorization-server');

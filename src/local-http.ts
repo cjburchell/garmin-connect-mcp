@@ -4,8 +4,11 @@ import { createHttpHandler, type HttpHandlerOptions } from './http.js';
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 export function createLocalServer(env = process.env, options: HttpHandlerOptions = {}): Server {
-  const publicOrigin = env.PUBLIC_URL ? new URL(env.PUBLIC_URL).origin : undefined;
-  if (publicOrigin && (!publicOrigin.startsWith('https://') || new URL(env.PUBLIC_URL!).pathname !== '/')) throw new Error('PUBLIC_URL must be an HTTPS origin without a path.');
+  const publicUrl = env.PUBLIC_URL ? new URL(env.PUBLIC_URL) : undefined;
+  const publicOrigin = publicUrl?.origin;
+  const basePath = publicUrl?.pathname.replace(/\/+$/, '') ?? '';
+  const publicBase = publicOrigin ? publicOrigin + basePath : undefined;
+  if (publicUrl && (publicUrl.protocol !== 'https:' || publicUrl.search || publicUrl.hash || publicUrl.username || publicUrl.password || !/^(\/[a-zA-Z0-9_-]+)*$/.test(basePath))) throw new Error('PUBLIC_URL must be an HTTPS URL with a simple optional path prefix.');
   // Discovery works before account setup; this placeholder can never reach Garmin.
   const guardedFetch: typeof fetch = async (input, init) => {
     if (!env.GARMIN_API_KEY?.trim()) throw new Error('Configure GARMIN_API_KEY locally before querying Garmin.');
@@ -32,6 +35,8 @@ export function createLocalServer(env = process.env, options: HttpHandlerOptions
     try {
       const url = new URL(req.url ?? '/', publicOrigin ?? origin);
       if (url.origin !== (publicOrigin ?? origin)) { res.writeHead(403).end('Request origin refused'); return; }
+      // Funnel strips its mount prefix; direct local clients may retain it.
+      if (basePath && (url.pathname === basePath || url.pathname.startsWith(basePath + '/'))) url.pathname = url.pathname.slice(basePath.length) || '/';
       if (url.pathname === '/health' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ status: 'ok', garminConfigured: Boolean(env.GARMIN_API_KEY?.trim()), liveAccessEnabled: env.GARMIN_ALLOW_NETWORK === 'true', transport: 'streamable-http' }));
@@ -51,8 +56,23 @@ export function createLocalServer(env = process.env, options: HttpHandlerOptions
       for (const [key, value] of Object.entries(req.headers)) {
         if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
       }
-      const response = await handle(new Request(url, { method: req.method, headers,
+      let response = await handle(new Request(url, { method: req.method, headers,
         body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks) }));
+      if (basePath && publicBase && publicOrigin) {
+        const outgoing = new Headers(response.headers);
+        const challenge = outgoing.get('www-authenticate');
+        if (challenge) outgoing.set('www-authenticate', challenge.replace(publicOrigin + '/.well-known/', publicBase + '/.well-known/'));
+        const contentType = outgoing.get('content-type') ?? '';
+        if (url.pathname.startsWith('/.well-known/') || contentType.includes('text/html')) {
+          let body = await response.text();
+          if (contentType.includes('application/json')) {
+            const rebase = (value: unknown): unknown => typeof value === 'string' && (value === publicOrigin || value.startsWith(publicOrigin + '/')) ? publicBase + value.slice(publicOrigin.length) : Array.isArray(value) ? value.map(rebase) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, rebase(child)])) : value;
+            body = JSON.stringify(rebase(JSON.parse(body)));
+          } else body = body.replace('action="/oauth/authorize"', `action="${basePath}/oauth/authorize"`);
+          outgoing.delete('content-length');
+          response = new Response(body, { status: response.status, headers: outgoing });
+        } else response = new Response(response.body, { status: response.status, headers: outgoing });
+      }
       res.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body) {
         const reader = response.body.getReader();

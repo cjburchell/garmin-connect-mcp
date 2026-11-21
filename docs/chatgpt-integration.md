@@ -2,10 +2,12 @@
 
 ## Current authorized Tailscale deployment
 
+Update: ChatGPT reported discovery failures on port 8443. The deployment now uses standard HTTPS at `https://redpoint-desktop.tail04561f.ts.net/garmin/mcp`; the old 8443 listener has been removed. The cause of ChatGPT's original failure was not proven, but both OAuth discovery paths, consent form, PKCE code exchange, and authenticated discovery of 27 tools have now been verified through the new public route. All 186 tests pass. ChatGPT itself must still be retried with the new URL.
+
 The user subsequently explicitly requested Docker deployment and Tailscale access. On 2026-11-20 this was configured and verified:
 
 - Docker adapter: `http://127.0.0.1:8091/mcp`, automatic container restart.
-- Public authenticated Funnel: `https://redpoint-desktop.tail04561f.ts.net:8443/mcp`.
+- Public authenticated Funnel: `https://redpoint-desktop.tail04561f.ts.net/garmin/mcp`.
 - Existing mail Funnel remains on standard HTTPS port 443.
 - Garmin activity/detail/summary/sleep/HRV/daily-summary/Body Battery calls succeeded. Only response shapes were printed; personal data was not saved.
 - HTTPS OAuth discovery succeeds, unauthenticated MCP returns 401, and authenticated HTTPS discovery returns all 27 tools.
@@ -15,7 +17,7 @@ To add this deployment in ChatGPT, choose a custom MCP server with HTTPS connect
 
 | Field | Value |
 |---|---|
-| URL | `https://redpoint-desktop.tail04561f.ts.net:8443/mcp` |
+| URL | `https://redpoint-desktop.tail04561f.ts.net/garmin/mcp` |
 | Authentication | OAuth, user-defined client |
 | Client ID | `garmin-mcp` |
 | Client secret | `MCP_OAUTH_CLIENT_SECRET` from the local `.env` |
@@ -24,7 +26,7 @@ To add this deployment in ChatGPT, choose a custom MCP server with HTTPS connect
 
 Leave dynamic registration URL empty: this upstream implementation uses a configured confidential client. Do not enter `GARMIN_API_KEY` into ChatGPT. Manual ChatGPT creation/authorization and a tool call there remain required before claiming end-to-end ChatGPT verification.
 
-Funnel was started persistently with `tailscale funnel --bg --https=8443 8091`. Disable only Garmin using `tailscale funnel --https=8443 off`; do not reset all Funnel configuration, which would affect mail. `PUBLIC_URL` in `.env` controls the exact approved public origin and OAuth metadata. HTTPS origin validation and MCP authentication remain enforced. The Garmin key was imported from the user's existing `pass.env` into the access-restricted local `.env`; changes to the original file are not automatically reimported.
+Funnel uses two persistent routes: `/garmin` proxies to `http://127.0.0.1:8091`, and `/.well-known/oauth-authorization-server/garmin` proxies to `http://127.0.0.1:8091/.well-known/oauth-authorization-server` for RFC path-based discovery. Do not reset all Funnel configuration, which would affect mail. `PUBLIC_URL=https://redpoint-desktop.tail04561f.ts.net/garmin` controls the approved origin and path prefix. OAuth metadata, challenge URLs and consent form actions include that prefix. The Garmin key was imported from the user's existing `pass.env` into the access-restricted local `.env`; changes to the original file are not automatically reimported.
 
 Docker Desktop has a Windows user Run entry for sign-in startup. This requires the user to sign in, and has not been reboot-tested. Tailscale's Windows service and background Funnel must also remain healthy.
 
