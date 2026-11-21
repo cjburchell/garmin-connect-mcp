@@ -4,6 +4,8 @@ import { createHttpHandler, type HttpHandlerOptions } from './http.js';
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 export function createLocalServer(env = process.env, options: HttpHandlerOptions = {}): Server {
+  const publicOrigin = env.PUBLIC_URL ? new URL(env.PUBLIC_URL).origin : undefined;
+  if (publicOrigin && (!publicOrigin.startsWith('https://') || new URL(env.PUBLIC_URL!).pathname !== '/')) throw new Error('PUBLIC_URL must be an HTTPS origin without a path.');
   // Discovery works before account setup; this placeholder can never reach Garmin.
   const guardedFetch: typeof fetch = async (input, init) => {
     if (!env.GARMIN_API_KEY?.trim()) throw new Error('Configure GARMIN_API_KEY locally before querying Garmin.');
@@ -22,11 +24,14 @@ export function createLocalServer(env = process.env, options: HttpHandlerOptions
     const started = Date.now();
     const origin = `http://127.0.0.1:${(res.socket?.localPort)}`;
     const allowedHosts = [new URL(origin).host, `localhost:${res.socket?.localPort}`];
-    if (!allowedHosts.includes(req.headers.host ?? '') || (req.headers.origin && ![origin, origin.replace('127.0.0.1', 'localhost')].includes(req.headers.origin))) {
+    if (publicOrigin) allowedHosts.push(new URL(publicOrigin).host);
+    const allowedOrigins = [origin, origin.replace('127.0.0.1', 'localhost'), ...(publicOrigin ? [publicOrigin] : [])];
+    if (!allowedHosts.includes(req.headers.host ?? '') || (req.headers.origin && !allowedOrigins.includes(req.headers.origin))) {
       res.writeHead(403).end('Host or Origin refused'); return;
     }
     try {
-      const url = new URL(req.url ?? '/', origin);
+      const url = new URL(req.url ?? '/', publicOrigin ?? origin);
+      if (url.origin !== (publicOrigin ?? origin)) { res.writeHead(403).end('Request origin refused'); return; }
       if (url.pathname === '/health' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ status: 'ok', garminConfigured: Boolean(env.GARMIN_API_KEY?.trim()), liveAccessEnabled: env.GARMIN_ALLOW_NETWORK === 'true', transport: 'streamable-http' }));

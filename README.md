@@ -13,7 +13,7 @@ docker compose up -d --build
 curl.exe http://127.0.0.1:8091/health
 ```
 
-Enable Docker Desktop's **Start Docker Desktop when you sign in** setting. Compose uses `restart: unless-stopped`: the adapter restarts when Docker starts, unless deliberately stopped. This is sign-in startup, not an unattended Windows boot service. The image runs as a non-root user with a read-only filesystem; only the host loopback interface publishes port 8091. It contains no credentials or development dependencies.
+Enable Docker Desktop's **Start Docker Desktop when you sign in** setting (this PC now also has a Docker Desktop user startup entry). Compose uses `restart: unless-stopped`: the adapter restarts when Docker starts, unless deliberately stopped. This is sign-in startup, not an unattended Windows boot service. The image runs as a non-root user with a read-only filesystem; only the host loopback interface publishes port 8091. It contains no credentials or development dependencies.
 
 Without Docker, use Node **24 LTS** (tested on Windows):
 

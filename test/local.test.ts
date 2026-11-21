@@ -28,6 +28,12 @@ async function connect(url: string) {
   return client;
 }
 describe('Windows-compatible local HTTP host', () => {
+  it('uses only the configured public origin for OAuth behind an authorized proxy', async () => {
+    const url = await start({ PUBLIC_URL: 'https://garmin.example:8443', MCP_OAUTH_CLIENT_SECRET: 'a-client-secret-at-least-32-characters' });
+    const response = await fetch(url + '/.well-known/oauth-authorization-server');
+    expect(await response.json()).toMatchObject({ issuer: 'https://garmin.example:8443', token_endpoint: 'https://garmin.example:8443/oauth/token' });
+    expect((await fetch(url + '/mcp', { headers: { origin: 'https://untrusted.example' } })).status).toBe(403);
+  });
   it('serves health and discovers all tools without Garmin credentials or network', async () => {
     const url = await start();
     expect(await (await fetch(url + '/health')).json()).toMatchObject({ status: 'ok', garminConfigured: false, liveAccessEnabled: false });

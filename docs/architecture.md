@@ -29,7 +29,7 @@ Node host binds `127.0.0.1` by default. Docker binds inside its container and pu
 
 The local host blocks external Garmin calls until `GARMIN_ALLOW_NETWORK=true`, requires a configured key, allows only the official HTTPS origin, and rejects redirects. Live API error bodies are discarded to avoid returning echoed credentials. Diagnostics contain status/duration, not headers, URLs, parameters, passwords, tokens or health data. Upstream stdio/deployment scripts are retained for compatibility but do not use the new local host's explicit network gate; use the documented local HTTP/Docker entrypoints.
 
-No firewall rules, public deployment, Garmin account integrations, tunnel registrations or paid services were created. Live authentication and account-specific metric availability remain unverified until authorized.
+Initially no firewall rules, public deployment, Garmin account integrations, tunnel registrations or paid services were created. After explicit user authorization, the Docker adapter was connected through authenticated Tailscale Funnel on port 8443 and live read-only Garmin calls succeeded. See the current-deployment section in chatgpt-integration.md. No firewall rules, paid infrastructure or OpenAI tunnel resources were created. Actual ChatGPT account connection remains a manual verification step.
 
 ## Primary references
 
